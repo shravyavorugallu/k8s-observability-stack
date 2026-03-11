@@ -1,0 +1,59 @@
+groups:
+  - name: cluster.nodes
+    interval: 60s
+    rules:
+      - alert: NodeDown
+        expr: up{job="cluster-nodes"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Compute node {{ $labels.instance }} is down"
+          description: "Node {{ $labels.instance }} has been unreachable for >2 minutes"
+
+      - alert: NodeHighCPU
+        expr: 100 - (avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | printf \"%.1f\" }}% on {{ $labels.instance }}"
+
+      - alert: NodeMemoryPressure
+        expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Memory pressure on {{ $labels.instance }}"
+          description: "Only {{ $value | printf \"%.1f\" }}% memory available on {{ $labels.instance }}"
+
+      - alert: NodeDiskFull
+        expr: (node_filesystem_avail_bytes{mountpoint=~"/scratch|/home|/apps"} / node_filesystem_size_bytes) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk on {{ $labels.instance }}:{{ $labels.mountpoint }}"
+          description: "{{ $value | printf \"%.1f\" }}% disk remaining on {{ $labels.mountpoint }}"
+
+      - alert: NodeNFSMountMissing
+        expr: node_filesystem_size_bytes{fstype="nfs4"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "NFS mount missing on {{ $labels.instance }}"
+          description: "NFS filesystem {{ $labels.mountpoint }} not mounted on {{ $labels.instance }}"
+
+  - name: cluster.jobs
+    rules:
+      - alert: SlurmExporterDown
+        expr: up{job="slurm-exporter"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SLURM exporter unreachable"
+          description: "Cannot scrape SLURM metrics — job scheduler health unknown"
